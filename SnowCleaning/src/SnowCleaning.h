@@ -21,56 +21,66 @@ typedef vector<int> vi;
 typedef vector<vi> vvi;
 typedef pair<int,int> ii;
 
-class SnowCleaning;
+class Board;
 
 class Worker {
 public:
-	Worker(int startR, int startC, int theID, int theLimit) {
-		r = startR;
-		c = startC;
-		id = theID;
-//		pClean = parent;
-		L = theLimit;
-	}
+	Worker(int startR, int startC, int theID, Board *ptheBoard)
+	: pBoard(ptheBoard)	{	r = startR;		c = startC;		id = theID;		newHire = true;	}
 
-	string MoveNaive0() {
-		static int lastLineID = -1;
-		std::stringstream ss;
-		ss << "M " << id << " ";
-		string order = ss.str();
-		if(r % 2 || lastLineID == id) {
-			if(c) {
-				c--;
-				return order + "L";
-			}//else
-			if(lastLineID == id) {
-				lastLineID = -1;
-				return MoveNaive0();
-			}
-			r--;
-			return order + "U";
-		}
-		else {
-			if(c < L - 1) {
-				c++;
-				return order + "R";
-			}//else
-			if(r < L - 1) {
-				r++;
-				return order + "D";
-			}//	else
-			lastLineID = id;
-			return MoveNaive0();
-		}
-	}
+	string MoveNaive0();
 
 public:
-	int r;
-	int c;
-	int id;
-	int L;
-//	SnowCleaning* pClean;
+	int r, c, id;
+private:
+	Board * pBoard;
+	bool newHire;
 };
+
+class Board {
+public:
+	Board(int theLimit, map<int, Worker*> & theIdWorkers)
+	: snow(theLimit), idWorkers(theIdWorkers)
+	{	L = theLimit;
+		FOR(r, 0 , L) {
+			snow.resize(L);
+			FOR(c, 0, L) {
+				snow[r][c] = false;
+	}	}	}
+
+	int size() {return L;}
+
+	void NewSnow(const vector<int> & snowFalls) {
+		int falls = snowFalls.size() / 2;
+		FOR(i, 0, falls) {
+			int r = snowFalls[2 * 1 + 0];
+			int c = snowFalls[2 * 1 + 1];
+			snow[r][c] = true;
+		}
+	}
+	int FirstSnowOnRow(int r) {
+		FOR(i,0,L){
+			if(snow[r][i])
+				return i;
+		}
+		return -1;
+	}
+	bool HasWorkerOnRow(int r) {
+		for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it)
+		{
+			Worker* pW = it->second;
+			if(pW->r == r)
+				return true;
+		}
+		return false;
+	}
+
+private:
+	int L;
+	vector<vector<bool> > snow;
+	map<int, Worker*> & idWorkers;
+};
+
 
 class SnowCleaning {
 public:
@@ -80,49 +90,43 @@ public:
 		F = snowFine;
 		day = 0;
 		workers = 0;
+		pBoard = new Board(L, idWorkers);
 		return 0;
 	}
 
 	vector<string> nextDay(vector<int> snowFalls) {
-		vector<string> orders;
-		if(day == 0) {
-			FOR(i, 0, L) {
-				string order;
-				if(i % 2)
-					order = Hire(i, L - 1);
-				else
-					order = Hire(i, 0);
-				if(order != "")
-					orders.push_back(order);
+		pBoard->NewSnow(snowFalls);
 
-				order = Hire(i, L / 2);
+		vector<string> orders;
+
+			FOR(r, 0, L) {
+				string order;
+				int firstSnowRow = pBoard->FirstSnowOnRow(r);
+				bool workerRow = pBoard->HasWorkerOnRow(r);
+				if(firstSnowRow >= 0 && !workerRow) {
+					order = Hire(r, firstSnowRow);
+				}
+
 				if(order != "")
 					orders.push_back(order);
 			}
-		}
-		else {
+
+
 			FOR(i, 0, workers) {
 				string order;
 				order = idWorkers[i]->MoveNaive0();
-				orders.push_back(order);
+				if(order != "")
+					orders.push_back(order);
 			}
-		}
+
 		day++;
 		return orders;
 	}
 
+Board* pBoard;
+
 private:
-	string Hire(int r, int c) {
-		if(workers >= 100)
-			return "";
-		Worker* pW = new Worker(r, c, workers++, L);
-		idWorkers[pW->id] = pW;
-		std::stringstream ss;
-		std::string s;
-		ss << "H " << r << " " << c;
-		s = ss.str();
-		return s;
-	}
+	string Hire(int r, int c);
 
 public:
 	int L;
@@ -134,4 +138,53 @@ private:
 	map<int, Worker*> idWorkers;
 };
 
+inline
+string SnowCleaning::Hire(int r, int c) {
+	if(workers >= 100)
+		return "";
+	Worker* pW = new Worker(r, c, workers++, pBoard);
+	idWorkers[pW->id] = pW;
+
+	std::stringstream ss;
+	std::string s;
+	ss << "H " << r << " " << c;
+	s = ss.str();
+	return s;
+}
+
+inline
+string Worker::MoveNaive0() {
+	if(newHire) {
+		newHire = false;
+		return "";
+	}
+	static int lastLineID = -1;
+	std::stringstream ss;
+	ss << "M " << id << " ";
+	string order = ss.str();
+	if(r % 2 || lastLineID == id) {
+		if(c) {
+			c--;
+			return order + "L";
+		}//else
+		if(lastLineID == id) {
+			lastLineID = -1;
+			return MoveNaive0();
+		}
+		r--;
+		return order + "U";
+	}
+	else {
+		if(c < pBoard->size() - 1) {
+			c++;
+			return order + "R";
+		}//else
+		if(r < pBoard->size() - 1) {
+			r++;
+			return order + "D";
+		}//	else
+		lastLineID = id;
+		return MoveNaive0();
+	}
+}
 #endif /* SNOWCLEANING_H_ */
