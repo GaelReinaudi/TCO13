@@ -28,7 +28,7 @@ public:
 	Worker(int startR, int startC, int theID, Board *ptheBoard)
 	: pBoard(ptheBoard)	{	r = startR;		c = startC;		id = theID;		newHire = true;	}
 
-	string MoveNaive0();
+	string MoveNaive1();
 
 public:
 	int r, c, id;
@@ -53,8 +53,8 @@ public:
 	void NewSnow(const vector<int> & snowFalls) {
 		int falls = snowFalls.size() / 2;
 		FOR(i, 0, falls) {
-			int r = snowFalls[2 * 1 + 0];
-			int c = snowFalls[2 * 1 + 1];
+			int r = snowFalls[2 * i + 0];
+			int c = snowFalls[2 * i + 1];
 			snow[r][c] = true;
 		}
 	}
@@ -74,8 +74,10 @@ public:
 		}
 		return false;
 	}
+	// updates the snow map depending on where the cleaners are
+	void Clean();
 
-private:
+public:
 	int L;
 	vector<vector<bool> > snow;
 	map<int, Worker*> & idWorkers;
@@ -99,25 +101,27 @@ public:
 
 		vector<string> orders;
 
-			FOR(r, 0, L) {
-				string order;
-				int firstSnowRow = pBoard->FirstSnowOnRow(r);
-				bool workerRow = pBoard->HasWorkerOnRow(r);
-				if(firstSnowRow >= 0 && !workerRow) {
-					order = Hire(r, firstSnowRow);
-				}
-
-				if(order != "")
-					orders.push_back(order);
+		FOR(r, 0, L) {
+			string order;
+			int firstSnowRow = pBoard->FirstSnowOnRow(r);
+			bool workerRow = pBoard->HasWorkerOnRow(r);
+			if(firstSnowRow >= 0 && !workerRow) {
+				order = Hire(r, firstSnowRow);
 			}
 
+			if(order != "")
+				orders.push_back(order);
+		}
 
-			FOR(i, 0, workers) {
-				string order;
-				order = idWorkers[i]->MoveNaive0();
-				if(order != "")
-					orders.push_back(order);
-			}
+
+		FOR(i, 0, workers) {
+			string order;
+			order = idWorkers[i]->MoveNaive1();
+			if(order != "")
+				orders.push_back(order);
+		}
+
+		pBoard->Clean();
 
 		day++;
 		return orders;
@@ -153,38 +157,39 @@ string SnowCleaning::Hire(int r, int c) {
 }
 
 inline
-string Worker::MoveNaive0() {
+void Board::Clean() {
+	for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it)
+	{
+		Worker* pW = it->second;
+		int rW = pW->r;
+		int cW = pW->c;
+		snow[rW][cW] = false;
+	}
+}
+
+
+inline
+string Worker::MoveNaive1() {
 	if(newHire) {
 		newHire = false;
 		return "";
 	}
-	static int lastLineID = -1;
 	std::stringstream ss;
 	ss << "M " << id << " ";
 	string order = ss.str();
-	if(r % 2 || lastLineID == id) {
-		if(c) {
-			c--;
-			return order + "L";
-		}//else
-		if(lastLineID == id) {
-			lastLineID = -1;
-			return MoveNaive0();
-		}
-		r--;
-		return order + "U";
+	int rSn = pBoard->FirstSnowOnRow(r);
+	if(rSn < c && rSn >= 0) {
+		c--;
+		return order + "L";
 	}
-	else {
-		if(c < pBoard->size() - 1) {
-			c++;
-			return order + "R";
-		}//else
-		if(r < pBoard->size() - 1) {
-			r++;
-			return order + "D";
-		}//	else
-		lastLineID = id;
-		return MoveNaive0();
+	else if(rSn > c) {
+		c++;
+		return order + "R";
 	}
+	return "";
 }
+
+
+
+
 #endif /* SNOWCLEANING_H_ */
