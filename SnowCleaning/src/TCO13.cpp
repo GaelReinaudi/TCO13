@@ -22,6 +22,7 @@ int main() {
 
 	theCleaningObj.init(boardSize, salary, snowFine);
 
+//	for(int ex = 0; ex < 2; ex++) {
 	for(int t = 0; t < 2000; t++) {
 		int snowCnt = -1;
 		cin >> snowCnt;
@@ -40,6 +41,7 @@ int main() {
 		}
 		cout.flush();
 	}
+//	}
 
 	return 0;
 }

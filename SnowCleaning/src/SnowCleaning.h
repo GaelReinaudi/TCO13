@@ -105,7 +105,8 @@ public:
 			string order;
 			int firstSnowRow = pBoard->FirstSnowOnRow(r);
 			bool workerRow = pBoard->HasWorkerOnRow(r);
-			if(firstSnowRow >= 0 && !workerRow) {
+			bool workerRowP1 = pBoard->HasWorkerOnRow(r+1);
+			if(r%2 == 0 && firstSnowRow >= 0 && !workerRow && !workerRowP1) {
 				order = Hire(r, firstSnowRow);
 			}
 
@@ -178,6 +179,14 @@ string Worker::MoveNaive1() {
 	ss << "M " << id << " ";
 	string order = ss.str();
 	int rSn = pBoard->FirstSnowOnRow(r);
+	if((r%2 == 0) && (r < pBoard->L - 1) && (pBoard->snow[r+1][c] || rSn < 0)) {
+		r++;
+		return order + "D";
+	}
+	if((r%2 == 1) && (pBoard->snow[r-1][c] || rSn < 0)) {
+		r--;
+		return order + "U";
+	}
 	if(rSn < c && rSn >= 0) {
 		c--;
 		return order + "L";
