@@ -37,6 +37,10 @@ public:
 	double Manhattan(int otherR, int otherC) {
 		return abs(otherR - r) + abs(otherC - c);
 	}
+	double Distance(int otherR, int otherC) {
+		return sqrt((otherR - r)*(otherR - r) + (otherC - c)*(otherC - c));
+	}
+	double ValueInRadius();
 	string MoveForce();
 
 public:
@@ -124,13 +128,22 @@ public:
 		}
 		return false;
 	}
+	double ClosestWorker(int fromR, int fromC) {
+		double dist = 1000.0;
+		for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it) {
+			double Wd = it->second->Manhattan(fromR, fromC);
+			if(Wd < dist)
+				dist = Wd;
+		}
+		return dist;
+	}
 	// updates the snow map depending on where the cleaners are
 	void Clean();
 
 public:
 	int L;
 	map<int, Worker*> & idWorkers;
-private:
+//private:
 	vector<vector<bool> > snow;
 	vector<vector<double> > value;
 	vector<int> maxSnowRC;
@@ -139,55 +152,15 @@ private:
 
 class SnowCleaning {
 public:
-	int init(int boardSize, int salary, int snowFine) {
-		L = boardSize;
-		S = salary;
-		F = snowFine;
-		day = 0;
-		workers = 0;
-		pBoard = new Board(L, idWorkers);
-		radius = double(S) / double(F) * double(L) / 12;
-		return 0;
-	}
+	int init(int boardSize, int salary, int snowFine);
 
-	vector<string> nextDay(vector<int> snowFalls) {
-		pBoard->NewSnow(snowFalls);
-		pBoard->UpdateValues();
-
-		vector<string> orders;
-
-		vector<int> maxRC = pBoard->MaxSnow();
-		if(pBoard->TotalSnow() * 1.2 > (workers) * radius * radius) {
-			string order;
-			order = Hire(maxRC[0], maxRC[1]);
-			if(order != "")
-				orders.push_back(order);
-		}
-//		else if(pBoard->Val(maxRC[0], maxRC[1]) >= 8.0) {
-//			string order;
-//			order = Hire(maxRC[0], maxRC[1]);
-//			if(order != "")
-//				orders.push_back(order);
-//		}
-
-
-		FOR(i, 0, workers) {
-			string order;
-			order = idWorkers[i]->MoveForce();
-			if(order != "")
-				orders.push_back(order);
-		}
-
-		pBoard->Clean();
-
-		day++;
-		return orders;
-	}
+	vector<string> nextDay(vector<int> snowFalls);
 
 Board* pBoard;
 
 private:
 	string Hire(int r, int c);
+	bool DiceHire();
 
 public:
 	int L;
@@ -206,6 +179,10 @@ string SnowCleaning::Hire(int r, int c) {
 		return "";
 	Worker* pW = new Worker(r, c, workers++, pBoard, radius);
 	idWorkers[pW->id] = pW;
+
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
+	pBoard->UpdateValues();
 
 	std::stringstream ss;
 	std::string s;
@@ -230,6 +207,8 @@ string Worker::MoveR() {
 	if(c >= pBoard->L - 1)
 		return "";
 	c++;
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " R";
 	return ss.str();
 }
@@ -238,6 +217,8 @@ string Worker::MoveL() {
 	if(c <= 0)
 		return "";
 	c--;
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " L";
 	return ss.str();
 }
@@ -246,6 +227,8 @@ string Worker::MoveU() {
 	if(r <= 0)
 		return "";
 	r--;
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " U";
 	return ss.str();
 }
@@ -254,9 +237,106 @@ string Worker::MoveD() {
 	if(r  >= pBoard->L - 1)
 		return "";
 	r++;
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " D";
 	return ss.str();
 }
+inline
+double Worker::ValueInRadius() {
+	double val = 0.0;
+	FOR(y, r-radius / 2, r+radius / 2 + 1) {
+		FOR(x, c-radius / 2, c+radius / 2 + 1) {
+			val += pBoard->Val(x, y);
+		}
+	}
+	return val + 1.1;
+}
+
+
+inline
+int SnowCleaning::init(int boardSize, int salary, int snowFine) {
+	L = boardSize;
+	S = salary;
+	F = snowFine;
+	day = 0;
+	workers = 0;
+	pBoard = new Board(L, idWorkers);
+	radius = sqrt(double(S) / double(F)) * 2.8;
+	return 0;
+}
+
+inline
+bool SnowCleaning::DiceHire() {
+	double p = double(rand()) / double(RAND_MAX);
+	double t = double(day) / 1900.0;
+	double yes = p * p * p * p > t;
+	return yes;
+}
+
+inline
+vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
+	pBoard->NewSnow(snowFalls);
+	pBoard->UpdateValues();
+
+	vector<string> orders;
+
+	vector<int> maxRC = pBoard->MaxSnow();
+	if(pBoard->TotalSnow() > (workers + 1) * radius * radius * 1.0) {
+		if(DiceHire()) {
+			string order;
+			order = Hire(maxRC[0], maxRC[1]);
+			if(order != "")
+				orders.push_back(order);
+		}
+	}
+	if(pBoard->TotalSnow() > (workers + 2) * radius * radius * 1.1) {
+		if(DiceHire()) {
+			maxRC = pBoard->MaxSnow();
+			string order;
+			order = Hire(maxRC[0], maxRC[1]);
+			if(order != "")
+				orders.push_back(order);
+		}
+	}
+	maxRC = pBoard->MaxSnow();
+	double valTrig = 6.0;
+	double distTrig = radius * 25.0 / pBoard->Val(maxRC[0], maxRC[1]);
+	if(pBoard->Val(maxRC[0], maxRC[1]) > valTrig)
+	{
+		if(pBoard->ClosestWorker(maxRC[0], maxRC[1]) > distTrig) {
+			string order;
+			order = Hire(maxRC[0], maxRC[1]);
+			if(order != "")
+				orders.push_back(order);
+		}
+	}
+
+
+	FOR(i, 0, workers) {
+		string order;
+		order = idWorkers[i]->MoveForce();
+		if(order != "")
+			orders.push_back(order);
+	}
+
+	if(S < F && day >= 1999 - F / S){
+		FORALLrc {
+			if(pBoard->Snow(r, c)) {
+				string order;
+				order = Hire(r, c);
+				if(order != "")
+					orders.push_back(order);
+			}
+		}
+	}
+
+	pBoard->Clean();
+
+	day++;
+	return orders;
+}
+
 inline
 string Worker::MoveForce() {
 	if(newHire) {
@@ -287,13 +367,14 @@ string Worker::MoveForce() {
 		double dist = Manhattan(pW->r, pW->c);
 		if(dist == 0.0)
 			continue;
-//		Rx -= double(pW->c - c) * exp(-dist / radius) * 10.0;
-//		Ry -= double(pW->r - r) * exp(-dist / radius) * 10.0;
-		Rx -= double(pW->c - c) * radius * pW->radius / dist / dist * exp(-dist / radius * 0.2);
-		Ry -= double(pW->r - r) * radius * pW->radius / dist / dist * exp(-dist / radius * 0.2);
+		double valSnowWorker = pW->ValueInRadius() * 0.9;
+		Rx -= double(pW->c - c) / dist / dist / dist * valSnowWorker;
+		Ry -= double(pW->r - r) / dist / dist / dist * valSnowWorker;
+		Rx -= double(pW->c - c) * radius * pW->radius / dist * exp(-dist / radius * 0.58);
+		Ry -= double(pW->r - r) * radius * pW->radius / dist * exp(-dist / radius * 0.58);
 	}
 	// repulsion from walls
-	double wallFac = 0.7;
+	double wallFac = 0.7 * sqrt(2.2317495/radius);
 	Rx -= double(0-c) * radius * radius / double(c+1) / double(c+1) * exp(-double(c+1) / radius * wallFac);
 	Ry -= double(0-r) * radius * radius / double(r+1) / double(r+1) * exp(-double(r+1) / radius * wallFac);
 	Rx -= double(pBoard->L-c) * radius * radius / double(pBoard->L-c) / double(pBoard->L-c) * exp(-double(pBoard->L-c) / radius * wallFac);
@@ -303,6 +384,19 @@ string Worker::MoveForce() {
 	Fy *= radius * radius;
 	Fx += Rx;
 	Fy += Ry;
+	if(abs(Fx) > abs(Fy) && (Fx > 0.0 && !pBoard->Snow(r, c+1) || Fx < 0.0 && !pBoard->Snow(r, c-1))) {
+		if(Fy > 0.0 && pBoard->Snow(r+1, c))
+			return MoveD();
+		if(Fy < 0.0 && pBoard->Snow(r-1, c))
+			return MoveU();
+	}
+	if(abs(Fy) > abs(Fx) && (Fy > 0.0 && !pBoard->Snow(r+1, c) || Fy < 0.0 && !pBoard->Snow(r-1, c))) {
+		if(Fx > 0.0 && pBoard->Snow(r, c+1))
+			return MoveR();
+		if(Fx < 0.0 && pBoard->Snow(r, c-1))
+			return MoveL();
+	}
+
 	if(Fx > 0.0 && abs(Fx) > abs(Fy)) {
 		return MoveR();
 	}
