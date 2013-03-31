@@ -34,6 +34,8 @@ public:
 	string MoveL();
 	string MoveU();
 	string MoveD();
+	string MoveRandLR();
+	string MoveRandUD();
 	double Manhattan(int otherR, int otherC) {
 		return abs(otherR - r) + abs(otherC - c);
 	}
@@ -113,21 +115,6 @@ public:
 			}
 		}
 	}
-	int FirstSnowOnRow(int r) {
-		FOR(i,0,L){
-			if(snow[r][i])
-				return i;
-		}
-		return -1;
-	}
-	bool HasWorkerOnRow(int r) {
-		for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it) {
-			Worker* pW = it->second;
-			if(pW->r == r)
-				return true;
-		}
-		return false;
-	}
 	double ClosestWorker(int fromR, int fromC) {
 		double dist = 1000.0;
 		for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it) {
@@ -160,7 +147,8 @@ Board* pBoard;
 
 private:
 	string Hire(int r, int c);
-	bool DiceHire();
+	bool DiceHire0();
+	bool DiceHire1();
 
 public:
 	int L;
@@ -243,6 +231,29 @@ string Worker::MoveD() {
 	return ss.str();
 }
 inline
+string Worker::MoveRandLR() {
+return "";
+	if(r  >= pBoard->L - 1)
+		return MoveL();
+	if(r  <= 0)
+		return MoveR();
+	if(double(rand()) / double(RAND_MAX) < 0.5)
+		return MoveL();
+	return MoveR();
+}
+inline
+string Worker::MoveRandUD() {
+return "";
+	if(c  >= pBoard->L - 1)
+		return MoveU();
+	if(c  <= 0)
+		return MoveD();
+	if(double(rand()) / double(RAND_MAX) < 0.5)
+		return MoveU();
+	return MoveD();
+}
+
+inline
 double Worker::ValueInRadius() {
 	double val = 0.0;
 	FOR(y, r-radius / 2, r+radius / 2 + 1) {
@@ -267,11 +278,19 @@ int SnowCleaning::init(int boardSize, int salary, int snowFine) {
 }
 
 inline
-bool SnowCleaning::DiceHire() {
+bool SnowCleaning::DiceHire0() {
 	double p = double(rand()) / double(RAND_MAX);
 	double t = double(day) / 1900.0;
-	double yes = p * p * p * p > t;
+	bool yes = p*p*p*p > t;
 	return yes;
+}
+inline
+bool SnowCleaning::DiceHire1() {
+	double p = double(rand()) / double(RAND_MAX);
+	double t = double(day) / 1900.0;
+	double FsS = double(F) / double(S);
+	bool yes = p < (t) * FsS;
+	return false;
 }
 
 inline
@@ -283,7 +302,7 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 
 	vector<int> maxRC = pBoard->MaxSnow();
 	if(pBoard->TotalSnow() > (workers + 1) * radius * radius * 1.0) {
-		if(DiceHire()) {
+		if(DiceHire0()) {
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
 			if(order != "")
@@ -291,7 +310,7 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 		}
 	}
 	if(pBoard->TotalSnow() > (workers + 2) * radius * radius * 1.1) {
-		if(DiceHire()) {
+		if(DiceHire0()) {
 			maxRC = pBoard->MaxSnow();
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
@@ -303,6 +322,18 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 	double valTrig = 7.0;
 	double distTrig = radius * 25.0 / pBoard->Val(maxRC[0], maxRC[1]);
 	if(pBoard->Val(maxRC[0], maxRC[1]) >= valTrig)
+	{
+		if(pBoard->ClosestWorker(maxRC[0], maxRC[1]) > distTrig) {
+			string order;
+			order = Hire(maxRC[0], maxRC[1]);
+			if(order != "")
+				orders.push_back(order);
+		}
+	}
+	maxRC = pBoard->MaxSnow();
+	valTrig = 9.0;
+	distTrig = radius * 15.0 / pBoard->Val(maxRC[0], maxRC[1]);
+	if((pBoard->Val(maxRC[0], maxRC[1]) >= valTrig) && DiceHire1())
 	{
 		if(pBoard->ClosestWorker(maxRC[0], maxRC[1]) > distTrig) {
 			string order;
@@ -353,8 +384,10 @@ string Worker::MoveForce() {
 			if(dist == 0.0)
 				continue;
 			double val = pBoard->Val(otherR, otherC);
-			Fx += double(otherC - c) * val / dist / dist / dist;
-			Fy += double(otherR - r) * val / dist / dist / dist;
+			double oneOverDist = 1 / dist;
+			double tothe3 = oneOverDist * oneOverDist * oneOverDist;
+			Fx += double(otherC - c) * val * tothe3;
+			Fy += double(otherR - r) * val * tothe3;
 		}
 	}
 	double Rx = 0.0;
@@ -375,8 +408,8 @@ string Worker::MoveForce() {
 	}
 	// repulsion from walls
 	double wallFac = 0.7 * sqrt(2.2317495/radius);
-	Rx -= double(0-c) * radius * radius / double(c+1) / double(c+1) * exp(-double(c+1) / radius * wallFac);
-	Ry -= double(0-r) * radius * radius / double(r+1) / double(r+1) * exp(-double(r+1) / radius * wallFac);
+	Rx -= double(-1-c) * radius * radius / double(c+1) / double(c+1) * exp(-double(c+1) / radius * wallFac);
+	Ry -= double(-1-r) * radius * radius / double(r+1) / double(r+1) * exp(-double(r+1) / radius * wallFac);
 	Rx -= double(pBoard->L-c) * radius * radius / double(pBoard->L-c) / double(pBoard->L-c) * exp(-double(pBoard->L-c) / radius * wallFac);
 	Ry -= double(pBoard->L-r) * radius * radius / double(pBoard->L-r) / double(pBoard->L-r) * exp(-double(pBoard->L-r) / radius * wallFac);
 
@@ -398,16 +431,28 @@ string Worker::MoveForce() {
 	}
 
 	if(Fx > 0.0 && abs(Fx) > abs(Fy)) {
-		return MoveR();
+		string order = MoveR();
+		if(order == "")
+			order = MoveRandUD();
+		return order;
 	}
 	if(Fx < 0.0 && abs(Fx) > abs(Fy)) {
-		return MoveL();
+		string order = MoveL();
+		if(order == "")
+			order = MoveRandUD();
+		return order;
 	}
 	if(Fy > 0.0 && abs(Fy) > abs(Fx)) {
-		return MoveD();
+		string order = MoveD();
+		if(order == "")
+			order = MoveRandLR();
+		return order;
 	}
 	if(Fy < 0.0 && abs(Fy) > abs(Fx)) {
-		return MoveU();
+		string order = MoveU();
+		if(order == "")
+			order = MoveRandLR();
+		return order;
 	}
 
 	return "";
