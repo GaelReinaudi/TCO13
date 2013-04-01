@@ -34,6 +34,7 @@ public:
 	string MoveL();
 	string MoveU();
 	string MoveD();
+	string NoMove();
 	string MoveRandLR();
 	string MoveRandUD();
 	double Manhattan(int otherR, int otherC) {
@@ -231,8 +232,14 @@ string Worker::MoveD() {
 	return ss.str();
 }
 inline
+string Worker::NoMove() {
+	pBoard->snow[r][c] = false;
+	pBoard->value[r][c] = 0.0;
+	return "";
+}
+inline
 string Worker::MoveRandLR() {
-return "";
+return NoMove();
 	if(r  >= pBoard->L - 1)
 		return MoveL();
 	if(r  <= 0)
@@ -243,7 +250,7 @@ return "";
 }
 inline
 string Worker::MoveRandUD() {
-return "";
+return NoMove();
 	if(c  >= pBoard->L - 1)
 		return MoveU();
 	if(c  <= 0)
@@ -256,8 +263,9 @@ return "";
 inline
 double Worker::ValueInRadius() {
 	double val = 0.0;
-	FOR(y, r-radius / 2, r+radius / 2 + 1) {
-		FOR(x, c-radius / 2, c+radius / 2 + 1) {
+	int R = radius / 2 - 1;
+	FOR(y, r - R, r + R) {
+		FOR(x, c - R, c + R) {
 			val += pBoard->Val(x, y);
 		}
 	}
@@ -388,6 +396,12 @@ string Worker::MoveForce() {
 			double tothe3 = oneOverDist * oneOverDist * oneOverDist;
 			Fx += double(otherC - c) * val * tothe3;
 			Fy += double(otherR - r) * val * tothe3;
+			// short range force
+			double shortRange = 10.0;
+			if(dist <= 2) {
+			//	Fx += double(otherC - c) * shortRange;
+			//	Fy += double(otherR - r) * shortRange;
+			}
 		}
 	}
 	double Rx = 0.0;
@@ -417,6 +431,11 @@ string Worker::MoveForce() {
 	Fy *= radius * radius;
 	Fx += Rx;
 	Fy += Ry;
+
+	if(pBoard->Snow(r, c))
+		return NoMove();
+
+
 	if(abs(Fx) > abs(Fy) && (Fx > 0.0 && !pBoard->Snow(r, c+1) || Fx < 0.0 && !pBoard->Snow(r, c-1))) {
 		if(Fy > 0.0 && pBoard->Snow(r+1, c))
 			return MoveD();
@@ -455,7 +474,7 @@ string Worker::MoveForce() {
 		return order;
 	}
 
-	return "";
+	return NoMove();
 }
 
 
