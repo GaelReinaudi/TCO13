@@ -57,19 +57,24 @@ private:
 class Board {
 public:
 	Board(int theLimit, map<int, Worker*> & theIdWorkers)
-	: snow(theLimit), value(theLimit), idWorkers(theIdWorkers)
+	: snow(theLimit), value(theLimit), valueExt(theLimit), idWorkers(theIdWorkers)
 	{	L = theLimit;
 		FOR(r, 0 , L) {
 //			snow.resize(L);
 //			value.resize(L);
+//			valueExt.resize(L);
 			snow.at(r).resize(L);
 			value.at(r).resize(L);
+			valueExt.at(r).resize(L);
 			FOR(c, 0, L) {
 				snow[r][c] = false;
 				value[r][c] = 0;
+				valueExt[r][c] = 0;
 	}	}
 		maxSnowRC.push_back(L/2);
 		maxSnowRC.push_back(L/2);
+		maxSnowRCExt.push_back(L/2);
+		maxSnowRCExt.push_back(L/2);
 	}
 
 	int size() const {return L;}
@@ -84,6 +89,11 @@ public:
 			return 0;
 		return value[r][c];
 	}
+	double ValExt(int r, int c) const {
+		if(r < 0 || c < 0 || r >= L || c >= L)
+			return 0;
+		return valueExt[r][c];
+	}
 	int TotalSnow() {
 		int total = 0;
 		FORALLrc {
@@ -91,7 +101,8 @@ public:
 		}
 		return total;
 	}
-	vector<int> MaxSnow() {return maxSnowRC;}
+	vector<int> MaxSnow0() {return maxSnowRC;}
+	vector<int> MaxSnowExt() {return maxSnowRCExt;}
 
 	void NewSnow(const vector<int> & snowFalls) {
 		int falls = snowFalls.size() / 2;
@@ -103,6 +114,7 @@ public:
 	}
 	void UpdateValues() {
 		double maxi = 0.0;
+		double maxiExt = 0.0;
 		FORALLrc {
 			value[r][c] = Snow(r, c) ? 1.0 : 0.0;
 			if(Snow(r, c)) {
@@ -115,6 +127,18 @@ public:
 				maxi = value[r][c];
 			}
 		}
+		FORALLrc {
+			valueExt[r][c] = Val(r, c)+0.1;
+			if(Snow(r, c)) {
+				valueExt[r][c] += (Val(r+1, c)) + (Val(r-1, c)) + (Val(r, c+1)) + (Val(r, c-1))
+						+ (Val(r+1, c+1)) + (Val(r+1, c-1)) + (Val(r-1, c-1)) + (Val(r-1, c+1));
+			}
+			if(valueExt[r][c] > maxiExt) {
+				maxSnowRCExt[0] = r;
+				maxSnowRCExt[1] = c;
+				maxiExt = valueExt[r][c];
+			}
+		}
 	}
 	double ClosestWorker(int fromR, int fromC) {
 		double dist = 1000.0;
@@ -125,6 +149,15 @@ public:
 		}
 		return dist;
 	}
+	bool HasWorker(int inR, int inC) {
+		for(std::map<int, Worker*>::iterator it = idWorkers.begin(); it != idWorkers.end(); ++it) {
+			int rr = it->second->r;
+			int cc = it->second->c;
+			if(inR == rr && inC == cc)
+				return true;
+		}
+		return false;
+	}
 	// updates the snow map depending on where the cleaners are
 	void Clean();
 
@@ -134,7 +167,9 @@ public:
 //private:
 	vector<vector<bool> > snow;
 	vector<vector<double> > value;
+	vector<vector<double> > valueExt;
 	vector<int> maxSnowRC;
+	vector<int> maxSnowRCExt;
 };
 
 
@@ -171,6 +206,7 @@ string SnowCleaning::Hire(int r, int c) {
 
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	pBoard->UpdateValues();
 
 	std::stringstream ss;
@@ -195,9 +231,12 @@ inline
 string Worker::MoveR() {
 	if(c >= pBoard->L - 1)
 		return "";
+	if(pBoard->HasWorker(r, c+1))
+		return "";
 	c++;
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " R";
 	return ss.str();
 }
@@ -205,9 +244,12 @@ inline
 string Worker::MoveL() {
 	if(c <= 0)
 		return "";
+	if(pBoard->HasWorker(r, c-1))
+		return "";
 	c--;
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " L";
 	return ss.str();
 }
@@ -215,9 +257,12 @@ inline
 string Worker::MoveU() {
 	if(r <= 0)
 		return "";
+	if(pBoard->HasWorker(r-1, c))
+		return "";
 	r--;
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " U";
 	return ss.str();
 }
@@ -225,9 +270,12 @@ inline
 string Worker::MoveD() {
 	if(r  >= pBoard->L - 1)
 		return "";
+	if(pBoard->HasWorker(r+1, c))
+		return "";
 	r++;
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	std::stringstream ss;	ss << "M " << id << " D";
 	return ss.str();
 }
@@ -235,11 +283,12 @@ inline
 string Worker::NoMove() {
 	pBoard->snow[r][c] = false;
 	pBoard->value[r][c] = 0.0;
+	pBoard->valueExt[r][c] = 0.0;
 	return "";
 }
 inline
 string Worker::MoveRandLR() {
-return NoMove();
+//return NoMove();
 	if(r  >= pBoard->L - 1)
 		return MoveL();
 	if(r  <= 0)
@@ -250,7 +299,7 @@ return NoMove();
 }
 inline
 string Worker::MoveRandUD() {
-return NoMove();
+//return NoMove();
 	if(c  >= pBoard->L - 1)
 		return MoveU();
 	if(c  <= 0)
@@ -295,10 +344,15 @@ bool SnowCleaning::DiceHire0() {
 inline
 bool SnowCleaning::DiceHire1() {
 	double p = double(rand()) / double(RAND_MAX);
-	double t = double(day) / 1900.0;
+	double t = double(day) / 1999.0;
 	double FsS = double(F) / double(S);
-	bool yes = p < (t) * FsS;
+	double u = t * (FsS) / 2;
+	double v = u*u;
+	double w = v*v;
+	bool yes = p < v;
+
 	return false;
+	return yes;
 }
 
 inline
@@ -308,7 +362,9 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 
 	vector<string> orders;
 
-	vector<int> maxRC = pBoard->MaxSnow();
+	double FsS = double(F) / double(S);
+	vector<int> maxRC = pBoard->MaxSnowExt();
+	double valTrig = 60.0;
 	if(pBoard->TotalSnow() > (workers + 1) * radius * radius * 1.0) {
 		if(DiceHire0()) {
 			string order;
@@ -317,32 +373,18 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 				orders.push_back(order);
 		}
 	}
-	if(pBoard->TotalSnow() > (workers + 2) * radius * radius * 1.1) {
+	if(pBoard->TotalSnow() > (workers + 1) * radius * radius * 1.1) {
 		if(DiceHire0()) {
-			maxRC = pBoard->MaxSnow();
+			maxRC = pBoard->MaxSnowExt();
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
 			if(order != "")
 				orders.push_back(order);
 		}
 	}
-	maxRC = pBoard->MaxSnow();
-	double valTrig = 7.0;
-	double distTrig = radius * 25.0 / pBoard->Val(maxRC[0], maxRC[1]);
-	if(pBoard->Val(maxRC[0], maxRC[1]) >= valTrig)
-	{
-		if(pBoard->ClosestWorker(maxRC[0], maxRC[1]) > distTrig) {
-			string order;
-			order = Hire(maxRC[0], maxRC[1]);
-			if(order != "")
-				orders.push_back(order);
-		}
-	}
-	maxRC = pBoard->MaxSnow();
-	valTrig = 9.0;
-	distTrig = radius * 15.0 / pBoard->Val(maxRC[0], maxRC[1]);
-	if((pBoard->Val(maxRC[0], maxRC[1]) >= valTrig) && DiceHire1())
-	{
+	if(pBoard->ValExt(maxRC[0], maxRC[1]) >= valTrig) {
+		maxRC = pBoard->MaxSnowExt();
+		double distTrig = sqrt(radius) * 225.0 / pBoard->ValExt(maxRC[0], maxRC[1]);
 		if(pBoard->ClosestWorker(maxRC[0], maxRC[1]) > distTrig) {
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
@@ -385,9 +427,15 @@ string Worker::MoveForce() {
 
 	double Fx = 0.0;
 	double Fy = 0.0;
+	int l = pBoard->L;
+	int range = l;
 	// attraction by snow like gravity
-	FOR(otherR, 0, pBoard->L) {
-		FOR(otherC, 0, pBoard->L) {
+	FOR(otherR, r-range, r+range) {
+		if(otherR < 0 || otherR >= l)
+			continue;
+		FOR(otherC, c-range, c+range) {
+			if(otherC < 0 || otherC >= l)
+				continue;
 			double dist = Manhattan(otherR, otherC);
 			if(dist == 0.0)
 				continue;
@@ -397,10 +445,10 @@ string Worker::MoveForce() {
 			Fx += double(otherC - c) * val * tothe3;
 			Fy += double(otherR - r) * val * tothe3;
 			// short range force
-			double shortRange = 10.0;
-			if(dist <= 2) {
-			//	Fx += double(otherC - c) * shortRange;
-			//	Fy += double(otherR - r) * shortRange;
+			double shortRange = 100.0;
+			if(dist <= 1.5 && pBoard->Snow(otherR, otherC)) {
+				Fx += double(otherC - c) * shortRange;
+				Fy += double(otherR - r) * shortRange;
 			}
 		}
 	}
@@ -414,11 +462,14 @@ string Worker::MoveForce() {
 		double dist = Manhattan(pW->r, pW->c);
 		if(dist == 0.0)
 			continue;
-		double valSnowWorker = pW->ValueInRadius() * 0.9;
-		Rx -= double(pW->c - c) / dist / dist / dist * valSnowWorker;
-		Ry -= double(pW->r - r) / dist / dist / dist * valSnowWorker;
-		Rx -= double(pW->c - c) * radius * pW->radius / dist * exp(-dist / radius * 0.58);
-		Ry -= double(pW->r - r) * radius * pW->radius / dist * exp(-dist / radius * 0.58);
+		double fac = 0.9;
+		double valSnowWorker = pW->ValueInRadius() * fac;// * 0.9;
+		double oneOverDist = 1 / dist;
+		double tothe3 = oneOverDist * oneOverDist * oneOverDist;
+		Rx -= double(pW->c - c) * tothe3 * valSnowWorker;
+		Ry -= double(pW->r - r) * tothe3 * valSnowWorker;
+		Rx -= double(pW->c - c) * radius * pW->radius * oneOverDist * exp(-dist / radius * 0.58);
+		Ry -= double(pW->r - r) * radius * pW->radius * oneOverDist * exp(-dist / radius * 0.58);
 	}
 	// repulsion from walls
 	double wallFac = 0.7 * sqrt(2.2317495/radius);
@@ -429,8 +480,8 @@ string Worker::MoveForce() {
 
 	Fx *= radius * radius;
 	Fy *= radius * radius;
-	Fx += Rx;
-	Fy += Ry;
+	Fx += Rx;//*0.80;
+	Fy += Ry;//*0.80;
 
 	if(pBoard->Snow(r, c))
 		return NoMove();
@@ -449,32 +500,35 @@ string Worker::MoveForce() {
 			return MoveL();
 	}
 
-	if(Fx > 0.0 && abs(Fx) > abs(Fy)) {
+	double trig = 0.0;
+	if(Fx > trig && abs(Fx) > abs(Fy)) {
 		string order = MoveR();
-		if(order == "")
-			order = MoveRandUD();
+//		if(order == "")
+//			order = MoveRandUD();
 		return order;
 	}
-	if(Fx < 0.0 && abs(Fx) > abs(Fy)) {
+	if(Fx < -trig && abs(Fx) > abs(Fy)) {
 		string order = MoveL();
-		if(order == "")
-			order = MoveRandUD();
+//		if(order == "")
+//			order = MoveRandUD();
 		return order;
 	}
-	if(Fy > 0.0 && abs(Fy) > abs(Fx)) {
+	if(Fy > trig && abs(Fy) > abs(Fx)) {
 		string order = MoveD();
-		if(order == "")
-			order = MoveRandLR();
+//		if(order == "")
+//			order = MoveRandLR();
 		return order;
 	}
-	if(Fy < 0.0 && abs(Fy) > abs(Fx)) {
+	if(Fy < -trig && abs(Fy) > abs(Fx)) {
 		string order = MoveU();
-		if(order == "")
-			order = MoveRandLR();
+//		if(order == "")
+//			order = MoveRandLR();
 		return order;
 	}
 
-	return NoMove();
+	if(rand() < RAND_MAX / 2)
+		return MoveRandLR();
+	return MoveRandUD();
 }
 
 
