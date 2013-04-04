@@ -339,7 +339,7 @@ string Worker::MoveRandUD() {
 inline
 double Worker::ValueInRadius() {
 	double val = 0.0;
-	int R = radius / 2 - 1;
+	int R = radius / 2;
 	FOR(y, r - R, r + R) {
 		FOR(x, c - R, c + R) {
 			val += pBoard->Val(x, y);
@@ -437,9 +437,9 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 		}
 	}
 	maxRC = pBoard->MaxSnowExt();
-	double valTrig = 7.0;
-	double distTrig = radius * (23.0 + FsS + log(FsS)) / pBoard->Val(maxRC[0], maxRC[1]);
-	if(day < 111110 && maxRC[0] >=0 && pBoard->Val(maxRC[0], maxRC[1]) >= valTrig)
+	double valTrig = 6.5;
+	double distTrig = radius * (23.0 + FsS + log10(FsS)) / 6.0;//pBoard->Val(maxRC[0], maxRC[1]);
+	if(day < 1111000 * sqrt(FsS) && maxRC[0] >=0 && pBoard->Val(maxRC[0], maxRC[1]) >= valTrig)
 	{
 		if(pBoard->ClosestWorkerDist(maxRC[0], maxRC[1]) > distTrig) {
 			string order;
