@@ -14,9 +14,9 @@ using namespace std;
 
 #define sz(a) int((a).size())
 #define all(c) (c).begin(),(c).end()
-#define FOR(i,s,e) for (int i = int(s); i != int(e); i++)
+#define FOR(i,s,e) for (int i = int(s); i < int(e); i++)
 #define FORALLrc FOR(r,0,L) FOR(c,0,L)
-#define FORIT(i,c) for (typeof((c).begin()) i = (c).begin(); i != (c).end(); i++)
+#define FORIT(i,c) for (typeof((c).begin()) i = (c).begin(); i < (c).end(); i++)
 #define present(c,x) ((c).find(x) != (c).end())
 #define cpresent(c,x) (find(all(c),x) != (c).end())
 typedef vector<int> vi;
@@ -24,6 +24,9 @@ typedef vector<vi> vvi;
 typedef pair<int,int> ii;
 
 class Board;
+
+
+#define Arg(iiii) (pBoard->Arguments(Board::iiii))
 
 class Worker {
 public:
@@ -41,7 +44,7 @@ public:
 		return abs(otherR - r) + abs(otherC - c);
 	}
 	double Distance(int otherR, int otherC) {
-		return sqrt((otherR - r)*(otherR - r) + (otherC - c)*(otherC - c));
+		return sqrt(double((otherR - r)*(otherR - r) + (otherC - c)*(otherC - c)));
 	}
 	double ValueInRadius();
 	string MoveForce();
@@ -185,6 +188,38 @@ public:
 	}
 	// updates the snow map depending on where the cleaners are
 	void Clean();
+
+	void setArg(int i, double v) {
+		arg[i] = v;
+	}
+	enum ArgName{
+		PowAttrSnow
+		, PowRepWork
+		, shortRange
+		, rangeL			
+		, rangeAbs		
+		, facValSnowRep	
+		, repExpDecay1	
+		, repExpDecay2		
+		, wallFac			
+		, powRepWall		
+		, powFsF			
+		, powWorkHire1	
+		, powRadHire1		
+		, HireFac1		
+		, powWorkHire2	
+		, HireAddWork2	
+		, HireLogWork2	
+		, powRadHire2		
+		, valTrigHire3	
+		, powRadHire3
+		, Hire3FacAdd
+		, Hire3FacFsS
+	};
+	double Arguments(int i) {
+		return arg[i];
+	}
+	double arg[100];
 
 public:
 	int L;
@@ -339,7 +374,7 @@ string Worker::MoveRandUD() {
 inline
 double Worker::ValueInRadius() {
 	double val = 0.0;
-	int R = radius / 2;
+	int R = int(radius / 2);
 	FOR(y, r - R, r + R) {
 		FOR(x, c - R, c + R) {
 			val += pBoard->Val(x, y);
@@ -349,14 +384,14 @@ double Worker::ValueInRadius() {
 }
 inline
 vector<int> Worker::ClosestIsolatedSnow() {
-	int valS = 1000.0;
+	double valS = 1000.0;
 	vector<int> toRet; toRet.push_back(-1); toRet.push_back(-1);
 	FOR(d,1,pBoard->L) {
 		FOR(relR,-d,d+1) {
 			FOR(pm,0,2) {
 				int absR = r + relR;
 				int absC = pm ? (c + (d - abs(relR))) : (c - (d - abs(relR)));
-				int valtemp = pBoard->ValExt(absR, absC);
+				double valtemp = pBoard->ValExt(absR, absC);
 				if(valtemp > 0.5 && valtemp < valS) {
 					valS = valtemp;
 					toRet[0] = absR;
@@ -368,18 +403,6 @@ vector<int> Worker::ClosestIsolatedSnow() {
 			break;
 	}
 	return toRet;
-}
-
-inline
-int SnowCleaning::init(int boardSize, int salary, int snowFine) {
-	L = boardSize;
-	S = salary;
-	F = snowFine;
-	day = 0;
-	workers = 0;
-	pBoard = new Board(L, idWorkers);
-	radius = sqrt(double(S) / double(F)) * 2.8;
-	return 0;
 }
 
 inline
@@ -404,15 +427,55 @@ bool SnowCleaning::DiceHire1() {
 }
 
 inline
+int SnowCleaning::init(int boardSize, int salary, int snowFine) {
+	L = boardSize;
+	S = salary;
+	F = snowFine;
+	day = 0;
+	workers = 0;
+	pBoard = new Board(L, idWorkers);
+	radius = sqrt(double(S) / double(F)) * 2.8;
+
+	double defaultArgs[100] = {0};
+	for(int i = 0; i < 100 ; i++) {
+		pBoard->arg[i] = 0.0;
+	}
+	pBoard->arg[pBoard->PowAttrSnow		]	=	3.28;//3.0		;
+	pBoard->arg[pBoard->PowRepWork		]	=	1.68;//3.0		;
+	pBoard->arg[pBoard->shortRange		]	=	109;//100.0	;
+	pBoard->arg[pBoard->rangeL			]	=	0.49;//0.8		;
+	pBoard->arg[pBoard->rangeAbs		]	=	4.94;//0.0		;
+	pBoard->arg[pBoard->facValSnowRep	]	=	1.86;//0.9		;
+	pBoard->arg[pBoard->repExpDecay1	]	=	28.2;//20.0	;
+	pBoard->arg[pBoard->repExpDecay2	]	=	0.71;//0.58	;
+	pBoard->arg[pBoard->wallFac			]	=	0.79;//0.10	;
+	pBoard->arg[pBoard->powRepWall		]	=	0.35;//0.50	;
+	pBoard->arg[pBoard->powFsF			]	=	0.97;//1.0		;
+	pBoard->arg[pBoard->powWorkHire1	]	=	1.07;//1.0		;
+	pBoard->arg[pBoard->powRadHire1		]	=	1.55;//2.0		;
+	pBoard->arg[pBoard->HireFac1		]	=	1.56;//1.3		;
+	pBoard->arg[pBoard->powWorkHire2	]	=	-0.28;//1.0		;
+	pBoard->arg[pBoard->HireAddWork2	]	=	3.55;//3.0		;
+	pBoard->arg[pBoard->HireLogWork2	]	=	1.90;//1.0		;
+	pBoard->arg[pBoard->powRadHire2		]	=	1.81;//2.0		;
+	pBoard->arg[pBoard->valTrigHire3	]	=	5.23;//6.5		;
+	pBoard->arg[pBoard->powRadHire3		]	=	0.81;//1.0		;
+	pBoard->arg[pBoard->Hire3FacAdd		]	=	26.4;//23.0	;
+	pBoard->arg[pBoard->Hire3FacFsS		]	=	1.46;//1.0		;
+
+	return 0;
+}
+
+inline
 vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 	pBoard->NewSnow(snowFalls);
 	pBoard->UpdateValues();
 
 	vector<string> orders;
 //return orders;
-	double FsS = double(F) / double(S);
+	double FsS = pow(double(F) / double(S), Arg(powFsF));
 	vector<int> maxRC = pBoard->MaxSnowExt();
-	if(pBoard->TotalSnow() > (workers) * radius * radius * 1.3) {
+	if(pBoard->TotalSnow() > pow(workers, Arg(powWorkHire1)) * pow(radius, Arg(powRadHire1)) * Arg(HireFac1)) {
 		if(DiceHire0()) {
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
@@ -422,7 +485,7 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 		}
 	}
 	maxRC = pBoard->MaxSnowExt();
-	if(pBoard->TotalSnow() > (workers + 2.0 - log(FsS)) * radius * radius * 1.0) {
+	if(pBoard->TotalSnow() > (pow(workers, Arg(powWorkHire2)) + Arg(HireAddWork2) - Arg(HireLogWork2) * log(FsS)) * pow(radius, Arg(powRadHire2)) * 1.0) {
 		if(DiceHire0()) {
 			string order;
 			order = Hire(maxRC[0], maxRC[1]);
@@ -437,8 +500,8 @@ vector<string> SnowCleaning::nextDay(vector<int> snowFalls) {
 		}
 	}
 	maxRC = pBoard->MaxSnowExt();
-	double valTrig = 6.5;
-	double distTrig = radius * (23.0 + FsS + log10(FsS)) / 6.0;//pBoard->Val(maxRC[0], maxRC[1]);
+	double valTrig = Arg(valTrigHire3);
+	double distTrig = pow(radius, Arg(powRadHire3)) * (Arg(Hire3FacAdd) + Arg(Hire3FacFsS) * FsS + log10(FsS)) / 6.0;
 	if(day < 1111000 * sqrt(FsS) && maxRC[0] >=0 && pBoard->Val(maxRC[0], maxRC[1]) >= valTrig)
 	{
 		if(pBoard->ClosestWorkerDist(maxRC[0], maxRC[1]) > distTrig) {
@@ -518,7 +581,7 @@ string Worker::MoveForce() {
 //	if(Ar < 0)
 	{
 
-	int range = pBoard->L * 0.8;
+	int range = abs(int(double(pBoard->L) * Arg(rangeL)) + int(Arg(rangeAbs)));
 	// attraction by snow like gravity
 	FOR(otherR, r-range, r+range) {
 		if(otherR < 0 || otherR >= l)
@@ -533,11 +596,11 @@ string Worker::MoveForce() {
 //				continue;
 			double val = pBoard->Val(otherR, otherC);
 			double oneOverDist = 1 / dist;
-			double tothe3 = oneOverDist * oneOverDist * oneOverDist;
+			double tothe3 = pow(oneOverDist, Arg(PowAttrSnow));
 			Fx += double(otherC - c) * val * tothe3;
 			Fy += double(otherR - r) * val * tothe3;
 			// short range force
-			double shortRange = 100.0;
+			double shortRange = Arg(shortRange);
 			if(dist <= 1.5 && pBoard->Snow(otherR, otherC)) {
 				Fx += double(otherC - c) * shortRange;
 				Fy += double(otherR - r) * shortRange;
@@ -554,19 +617,20 @@ string Worker::MoveForce() {
 		double dist = Manhattan(pW->r, pW->c);
 		if(dist < 0.1)
 			continue;
-//		if(dist >= l / 3.5)
-//			continue;
-		double fac = 0.9;
-		double valSnowWorker = pW->ValueInRadius() * fac;// * 0.9;
+		if(dist > double(range))
+			continue;
+		double fac = Arg(facValSnowRep);// 0.9;
+		double valSnowWorker = pW->ValueInRadius() * fac;
 		double oneOverDist = 1 / dist;
-		double tothe3 = oneOverDist * oneOverDist * oneOverDist;
-		Rx -= double(pW->c - c) * tothe3 * valSnowWorker;
-		Ry -= double(pW->r - r) * tothe3 * valSnowWorker;
-		Rx -= double(pW->c - c) * radius * pW->radius * oneOverDist * exp(-dist / radius * 0.58);
-		Ry -= double(pW->r - r) * radius * pW->radius * oneOverDist * exp(-dist / radius * 0.58);
+		double tothe3 = pow(oneOverDist, Arg(PowRepWork));
+		//double tothe3 = oneOverDist * oneOverDist * oneOverDist;
+		Rx -= double(pW->c - c) * tothe3 * valSnowWorker * exp(-dist / radius * Arg(repExpDecay1));
+		Ry -= double(pW->r - r) * tothe3 * valSnowWorker * exp(-dist / radius * Arg(repExpDecay1));
+		Rx -= double(pW->c - c) * radius * pW->radius * oneOverDist * exp(-dist / radius * Arg(repExpDecay2));
+		Ry -= double(pW->r - r) * radius * pW->radius * oneOverDist * exp(-dist / radius * Arg(repExpDecay2));
 	}
 	// repulsion from walls
-	double wallFac = 0.7 * sqrt(2.2317495/radius);
+	double wallFac = Arg(wallFac) * pow(2.2317495/radius, Arg(powRepWall));
 	Rx -= double(-1-c) * radius * radius / double(c+1) / double(c+1) * exp(-double(c+1) / radius * wallFac);
 	Ry -= double(-1-r) * radius * radius / double(r+1) / double(r+1) * exp(-double(r+1) / radius * wallFac);
 	Rx -= double(pBoard->L-c) * radius * radius / double(pBoard->L-c) / double(pBoard->L-c) * exp(-double(pBoard->L-c) / radius * wallFac);

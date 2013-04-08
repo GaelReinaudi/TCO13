@@ -1,0 +1,2 @@
+for i in {1..11}; do echo "$i"; java -jar SnowCleaningVis.jar -exec Release/TCO13_SnowCleaning -delay 0 -seed $i -novis; done
+
